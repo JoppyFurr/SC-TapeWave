@@ -11,10 +11,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Note that the data in 8-bit wave files is unsigned. */
-#define WAVE_HIGH_X4    "\xff\xff\xff\xff"
-#define WAVE_LOW_X4     "\x00\x00\x00\x00"
-#define WAVE_ZERO       "\x80"
+/* Note that samples in 8-bit wave files are unsigned. */
+#define WAVE_ZERO       "\xff\xff\xff\xff\x00\x00\x00\x00"
+#define WAVE_ONE        "\xff\xff\x00\x00\xff\xff\x00\x00"
+#define WAVE_SILENT     "\x80"
 
 typedef enum tape_mode_e
 {
@@ -33,12 +33,12 @@ static int8_t checksum = 0;
  */
 static void write_silent_ms (uint32_t length)
 {
-    /* 19.2 samples per ms. */
-    int samples = length * 192 / 10;
+    /* 9.6 samples per ms. */
+    int samples = length * 96 / 10;
 
     for (int i = 0; i < samples; i++)
     {
-        fwrite (WAVE_ZERO, 1, 1, output_file);
+        fwrite (WAVE_SILENT, 1, 1, output_file);
     }
 }
 
@@ -46,19 +46,10 @@ static void write_silent_ms (uint32_t length)
 /*
  * Write a single bit to the wave file.
  */
-static void write_bit (bool value)
+static void write_bit (bool bit)
 {
-    /* Note: We have 16 samples per bit */
-    if (value)
-    {
-        /* '1' */
-        fwrite (WAVE_HIGH_X4 WAVE_LOW_X4 WAVE_HIGH_X4 WAVE_LOW_X4, 1, 16, output_file);
-    }
-    else
-    {
-        /* '0' */
-        fwrite (WAVE_HIGH_X4 WAVE_HIGH_X4 WAVE_LOW_X4 WAVE_LOW_X4, 1, 16, output_file);
-    }
+    /* Note: We have 8 samples per bit */
+    fwrite (bit ? WAVE_ONE : WAVE_ZERO, 1, 8, output_file);
 }
 
 
@@ -169,8 +160,8 @@ int main (int argc, char **argv)
     const uint32_t format_length            = 16;       /* Length of the format section in bytes */
     const uint16_t format_type              = 1;        /* PCM */
     const uint16_t format_channels          = 1;        /* Mono */
-    const uint32_t format_sample_rate       = 19200;    /* 19.2 kHz, giving 16 samples per tape-bit */
-    const uint32_t format_byte_rate         = 19200;    /* One byte per frame */
+    const uint32_t format_sample_rate       = 9600;    /* 9.6 kHz, giving 8 samples per tape-bit */
+    const uint32_t format_byte_rate         = 9600;    /* One byte per frame */
     const uint16_t format_block_align       = 1;        /* Frames are one-byte aligned */
     const uint16_t format_bits_per_sample   = 8;        /* 8-bit */
 
