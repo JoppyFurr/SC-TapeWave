@@ -108,8 +108,10 @@ static void write_tape (const char *name, uint16_t program_length, uint8_t *prog
     /* Write the program's start-address */
     if (mode == MODE_SC_MACHINE_CODE)
     {
+        int8_t _checksum = checksum;
         write_byte (start_address >> 8);
         write_byte (start_address & 0xff);
+        checksum = _checksum;
     }
 
     /* Write the parity byte */
