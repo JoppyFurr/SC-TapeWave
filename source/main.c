@@ -1,7 +1,8 @@
 /*
  * SC-TapeWave
- *
  * A tool to generate SC-3000 tape audio.
+ *
+ * JoppyFurr 2024
  */
 
 #include <ctype.h>
