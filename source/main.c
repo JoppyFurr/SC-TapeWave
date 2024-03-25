@@ -16,14 +16,6 @@
 #define WAVE_ONE        "\xff\xff\x00\x00\xff\xff\x00\x00"
 #define WAVE_SILENT     "\x80"
 
-typedef enum tape_mode_e
-{
-    MODE_INVALID = 0,
-    MODE_SC_MACHINE_CODE,
-    MODE_SC_BASIC
-} tape_mode_t;
-
-static tape_mode_t mode = MODE_INVALID;
 static FILE *output_file = NULL;
 static int8_t checksum = 0;
 
@@ -78,7 +70,7 @@ static void write_byte (uint8_t byte)
 /*
  * Write the tape to the wave file.
  */
-static void write_tape (const char *name, uint16_t program_length, uint8_t *program, uint16_t start_address)
+static void write_tape (const char *name, uint16_t program_length, uint8_t *program)
 {
     int name_length = strlen (name);
 
@@ -91,8 +83,8 @@ static void write_tape (const char *name, uint16_t program_length, uint8_t *prog
         write_bit (1);
     }
 
-    /* Write the header's key-code */
-    write_byte ((mode == MODE_SC_MACHINE_CODE) ? 0x26 : 0x16);
+    /* Write the header key-code */
+    write_byte (0x16);
     checksum = 0;
 
     /* Write the file-name */
@@ -102,17 +94,9 @@ static void write_tape (const char *name, uint16_t program_length, uint8_t *prog
     }
 
     /* Write the program length */
+    /* TODO: Confirm byte order - In the scanned document, pencil and ink disagree. */
     write_byte (program_length >> 8);
     write_byte (program_length & 0xff);
-
-    /* Write the program's start-address */
-    if (mode == MODE_SC_MACHINE_CODE)
-    {
-        int8_t _checksum = checksum;
-        write_byte (start_address >> 8);
-        write_byte (start_address & 0xff);
-        checksum = _checksum;
-    }
 
     /* Write the parity byte */
     write_byte (-checksum);
@@ -130,8 +114,8 @@ static void write_tape (const char *name, uint16_t program_length, uint8_t *prog
         write_bit (1);
     }
 
-    /* Write the code's key-code */
-    write_byte ((mode == MODE_SC_MACHINE_CODE) ? 0x27 : 0x17);
+    /* Write the program key-code */
+    write_byte (0x17);
     checksum = 0;
 
     /* Write the program */
@@ -177,50 +161,11 @@ int main (int argc, char **argv)
     fpos_t data_size_pos;
 
     const char *argv_0 = argv [0];
-    uint32_t start_address = 0;
 
-    /* Parameter parsing */
-    if (argc == 5 && strcmp (argv [1], "--basic") == 0)
+    /* Check parameters */
+    if (argc != 4)
     {
-        mode = MODE_SC_BASIC;
-        argv++;
-        argc--;
-
-        fprintf (stderr, "Error: BASIC support not yet implemented.");
-        return EXIT_FAILURE;
-
-        /* BASIC programs aren't just plain-text, the following format is used for each line:
-         *
-         * byte [0] = line length
-         * byte [1] = line number (LSB)
-         * byte [2] = line number (MSB)
-         * byte [3] = 0x00
-         * byte [4] = 0x00
-         * byte [5...n] = line contents
-         * byte [n + 1] = '\r'
-         *
-         * BASIC keywords are also stored using a 1-2 byte code to save space.
-         * When counting the line length, keywords only count as one byte. (what about 2-byte keywords?)
-         */
-    }
-    else if (argc == 6 && strcmp (argv [1], "--machine-code") == 0)
-    {
-        mode = MODE_SC_MACHINE_CODE;
-        start_address = strtol (argv [2], NULL, 16);
-        argv += 2;
-        argc -= 2;
-    }
-
-    /* If we have a start_address, check that it will fit in the tape's 16-bit start-address field */
-    if (start_address > 0xffff)
-    {
-        fprintf (stderr, "Error: Start address '0x%x' is too high.\n", start_address);
-        return EXIT_FAILURE;
-    }
-
-    if (mode == MODE_INVALID || argc != 4)
-    {
-        fprintf (stderr, "Usage: %s <--basic|--machine-code <start-address>> <name-on-tape> <input-file> <output-file.wav>\n", argv_0);
+        fprintf (stderr, "Usage: %s <name-on-tape> <input-file> <output-file.wav>\n", argv_0);
         return EXIT_FAILURE;
     }
 
@@ -298,7 +243,7 @@ int main (int argc, char **argv)
     fwrite ("data", 1, 4, output_file);
     fgetpos (output_file, &data_size_pos);
     fwrite (&data_size, 1, 4, output_file);
-    write_tape (tape_name, program_length, program_buffer, start_address);
+    write_tape (tape_name, program_length, program_buffer);
 
     /* Get size */
     output_file_size = ftell (output_file);
